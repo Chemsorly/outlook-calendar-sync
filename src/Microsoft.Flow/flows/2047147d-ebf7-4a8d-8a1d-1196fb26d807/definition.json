@@ -1,0 +1,1225 @@
+{
+  "name": "b82461c9-4e37-4b2c-b223-ff2f436bbe3c",
+  "id": "/providers/Microsoft.Flow/flows/b82461c9-4e37-4b2c-b223-ff2f436bbe3c",
+  "type": "Microsoft.Flow/flows",
+  "properties": {
+    "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+    "displayName": "Scheduled calendar sync v0.8",
+    "definition": {
+      "metadata": {
+        "workflowEntityId": null,
+        "processAdvisorMetadata": null,
+        "flowChargedByPaygo": null,
+        "flowclientsuspensionreason": "None",
+        "flowclientsuspensiontime": null,
+        "flowclientsuspensionreasondetails": null,
+        "creator": {
+          "id": "6a3f8d4b-482b-4acb-9128-c4748e9b93a1",
+          "type": "User",
+          "tenantId": "331e8350-a57c-43c3-9a37-d76cf8000f52"
+        },
+        "provisioningMethod": "FromDefinition",
+        "failureAlertSubscription": true,
+        "clientLastModifiedTime": "2024-01-05T17:52:16.2911507Z",
+        "connectionKeySavedTimeKey": "2024-01-05T17:52:16.2911507Z"
+      },
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": { "defaultValue": {}, "type": "Object" },
+        "$authentication": { "defaultValue": {}, "type": "SecureObject" }
+      },
+      "triggers": {
+        "Setting:_Trigger_interval": {
+          "recurrence": {
+            "frequency": "Week",
+            "interval": 1,
+            "timeZone": "W. Europe Standard Time",
+            "startTime": "2023-02-10T09:00:00Z",
+            "schedule": {
+              "weekDays": [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday"
+              ],
+              "hours": ["8", "10", "12", "14", "16", "18"],
+              "minutes": [0]
+            }
+          },
+          "metadata": {
+            "operationMetadataId": "8b7dd129-9e4d-4f52-8c69-8ac663bd9bd4"
+          },
+          "type": "Recurrence",
+          "description": "Because of strong limitations in the \"free\" PowerAutomate plan, it is recommended to only run the flow a few times per day. There is also a daily limit, so not running the flow at night will benefit you.",
+          "runtimeConfiguration": { "concurrency": { "runs": 1 } }
+        }
+      },
+      "actions": {
+        "Setting:_Prefix_for_SyncBlocker_events_for_the_target_calendar": {
+          "runAfter": {},
+          "metadata": {
+            "operationMetadataId": "c2eb347b-cc0c-40ce-b882-b8f7a2a67f1b"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "syncBlockerEventName",
+                "type": "string",
+                "value": "SyncBlocker: "
+              }
+            ]
+          },
+          "description": "Choose something that is unique, i.e., it is unlikely that someone MANUALLY uses this prefix when creating an event. Only change this BEFORE running the flow for the first time!"
+        },
+        "Setting:_Days_to_sync": {
+          "runAfter": {
+            "Setting:_Prefix_for_SyncBlocker_events_for_the_target_calendar": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "c6c9bce7-28b3-43e5-9c4f-56a93a4c7410"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              { "name": "daysToSync", "type": "integer", "value": 1 }
+            ]
+          },
+          "description": "The number of days (starting from \"now\") that each flow execution will look into the future, to sync your calendar events."
+        },
+        "Setting:_create_SyncBlocker_events_only_for_these_event_responses": {
+          "runAfter": { "Setting:_Days_to_sync": ["Succeeded"] },
+          "metadata": {
+            "operationMetadataId": "58e8213b-64b2-4136-a174-31b63a6e9515"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "eventResponseTypes",
+                "type": "array",
+                "value": ["organizer", "accepted", "tentativelyAccepted"]
+              }
+            ]
+          },
+          "description": "Defines the alternative ways of responding to an event. SyncBlockers will only be created for events for which you responded. E.g. [\"organizer\", \"accepted\", \"tentativelyAccepted\", \"notResponded\"]"
+        },
+        "Setting:_name_of_cal1": {
+          "runAfter": {
+            "Setting:_category_for_SyncBlocker_events_in_calendar_2": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "75a68ad0-8f47-4558-961c-fb7fbfcf9602"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              { "name": "nameCalendar1", "type": "string", "value": "Calendar" }
+            ]
+          },
+          "description": "The name of calendar 1, as shown in Outlook"
+        },
+        "Setting:_name_of_cal2": {
+          "runAfter": { "Setting:_name_of_cal1": ["Succeeded"] },
+          "metadata": {
+            "operationMetadataId": "61c938ee-7dc1-4b58-9d51-999e0f6c7dc8"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              { "name": "nameCalendar2", "type": "string", "value": "Calendar" }
+            ]
+          },
+          "description": "The name of calendar 2, as shown in Outlook"
+        },
+        "Get_calendars_of_Outlook_account_1": {
+          "runAfter": { "Setting:_name_of_cal2": ["Succeeded"] },
+          "metadata": {
+            "operationMetadataId": "369df8f5-ba70-4bc6-bcd9-97a87e0e6f77"
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+              "connectionName": "shared_office365",
+              "operationId": "CalendarGetTables_V2"
+            },
+            "parameters": {},
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Find_correct_cal1_calendar": {
+          "runAfter": { "Get_calendars_of_Outlook_account_1": ["Succeeded"] },
+          "metadata": {
+            "operationMetadataId": "54c7e0cc-7527-4583-b40a-b9ca93a4d023"
+          },
+          "type": "Query",
+          "inputs": {
+            "from": "@outputs('Get_calendars_of_Outlook_account_1')?['body/value']",
+            "where": "@equals(item()?['name'], variables('nameCalendar1'))"
+          }
+        },
+        "Get_calendars_of_Outlook_account_2": {
+          "runAfter": { "Find_correct_cal1_calendar": ["Succeeded"] },
+          "metadata": {
+            "operationMetadataId": "9fee587f-da58-46eb-a7d9-6a829603dd0b"
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+              "connectionName": "shared_office365_1",
+              "operationId": "CalendarGetTables_V2"
+            },
+            "parameters": {},
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Find_correct_cal2_calendar": {
+          "runAfter": { "Get_calendars_of_Outlook_account_2": ["Succeeded"] },
+          "metadata": {
+            "operationMetadataId": "e58c26c4-5770-4e42-a59d-ee2f5b9d0253"
+          },
+          "type": "Query",
+          "inputs": {
+            "from": "@outputs('Get_calendars_of_Outlook_account_2')?['body/value']",
+            "where": "@equals(item()?['name'], variables('nameCalendar2'))"
+          }
+        },
+        "Check_that_calendars_exist": {
+          "actions": {
+            "Set_cal1id_value": {
+              "runAfter": {},
+              "metadata": {
+                "operationMetadataId": "52fe2c73-b259-4d77-9385-d8b83add85ab"
+              },
+              "type": "SetVariable",
+              "inputs": {
+                "name": "cal1id",
+                "value": "@{body('Find_correct_cal1_calendar')[0]['id']}"
+              }
+            },
+            "Set_cal2id_value": {
+              "runAfter": { "Set_cal1id_value": ["Succeeded"] },
+              "metadata": {
+                "operationMetadataId": "8c31f3e3-2978-463c-8562-4b9e34513e62"
+              },
+              "type": "SetVariable",
+              "inputs": {
+                "name": "cal2id",
+                "value": "@{body('Find_correct_cal2_calendar')[0]['id']}"
+              }
+            },
+            "Get_calendar_view_of_events_cal1": {
+              "runAfter": { "Set_cal2id_value": ["Succeeded"] },
+              "metadata": {
+                "operationMetadataId": "824c7eff-9b77-4c75-8183-ce73ee17c6d4"
+              },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                  "connectionName": "shared_office365",
+                  "operationId": "GetEventsCalendarViewV3"
+                },
+                "parameters": {
+                  "calendarId": "@variables('cal1id')",
+                  "startDateTimeUtc": "@utcNow()",
+                  "endDateTimeUtc": "@addDays(utcNow(), variables('daysToSync'))",
+                  "$orderby": "Start/DateTime",
+                  "$top": "@variables('eventCountUpperLimit')"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Store_events_in_cal1": {
+              "runAfter": { "Get_calendar_view_of_events_cal1": ["Succeeded"] },
+              "metadata": {
+                "operationMetadataId": "0d2bd587-f8fe-4331-8b76-5812f647b816"
+              },
+              "type": "SetVariable",
+              "inputs": {
+                "name": "cal1",
+                "value": "@outputs('Get_calendar_view_of_events_cal1')?['body/value']"
+              }
+            },
+            "Get_calendar_view_of_events_cal2": {
+              "runAfter": { "Check_event_count_cal1": ["Succeeded"] },
+              "metadata": {
+                "operationMetadataId": "bc66297d-58a3-42ef-bfa7-6b276dbd4984"
+              },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                  "connectionName": "shared_office365_1",
+                  "operationId": "GetEventsCalendarViewV3"
+                },
+                "parameters": {
+                  "calendarId": "@variables('cal2id')",
+                  "startDateTimeUtc": "@utcNow()",
+                  "endDateTimeUtc": "@addDays(utcNow(), variables('daysToSync'))",
+                  "$orderby": "Start/DateTime",
+                  "$top": "@variables('eventCountUpperLimit')"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Store_events_in_cal2": {
+              "runAfter": { "Get_calendar_view_of_events_cal2": ["Succeeded"] },
+              "metadata": {
+                "operationMetadataId": "8e9f2214-4b39-4d74-917c-bfe076d3f06d"
+              },
+              "type": "SetVariable",
+              "inputs": {
+                "name": "cal2",
+                "value": "@outputs('Get_calendar_view_of_events_cal2')?['body/value']"
+              }
+            },
+            "sbcal1": {
+              "runAfter": { "Check_event_count_cal2": ["Succeeded"] },
+              "metadata": {
+                "operationMetadataId": "3f65f354-0002-43cb-9d7d-021f3b38f064"
+              },
+              "type": "Query",
+              "inputs": {
+                "from": "@variables('cal1')",
+                "where": "@startsWith(item()?['subject'], variables('syncBlockerEventName'))"
+              },
+              "description": "The SyncBlocker-events of calendar 1"
+            },
+            "realcal1": {
+              "runAfter": { "sbcal1": ["Succeeded"] },
+              "metadata": {
+                "operationMetadataId": "346f77aa-b7c3-4182-8eb2-74861a33fdc8"
+              },
+              "type": "Query",
+              "inputs": {
+                "from": "@variables('cal1')",
+                "where": "@and(\n  not(startsWith(item()?['subject'],variables('syncBlockerEventName'))),\n  contains(variables('eventResponseTypes'), item()?['responseType']),\n  not(empty(item()?['iCalUId'])),\n  variables('syncToCal2'),\n  or(\n  \tvariables('syncEventsWithoutAttendees'),\n  \tor(\n    \tnot(empty(item()?['requiredAttendees'])),\n    \tnot(empty(item()?['optionalAttendees']))\n  \t)\n  )\n)"
+              },
+              "description": "The real events of calendar 1 (only those for which we want SyncBlocker events)"
+            },
+            "sbcal2": {
+              "runAfter": { "realcal1": ["Succeeded"] },
+              "metadata": {
+                "operationMetadataId": "6855e863-3af2-41af-9abd-4c8d4f09548b"
+              },
+              "type": "Query",
+              "inputs": {
+                "from": "@variables('cal2')",
+                "where": "@startsWith(item()?['subject'], variables('syncBlockerEventName'))"
+              },
+              "description": "The SyncBlocker-events of calendar 2"
+            },
+            "realcal2": {
+              "runAfter": { "sbcal2": ["Succeeded"] },
+              "metadata": {
+                "operationMetadataId": "0f1aa3e7-82db-458a-9a23-ab90e2f75c68"
+              },
+              "type": "Query",
+              "inputs": {
+                "from": "@variables('cal2')",
+                "where": "@and(\n  not(startsWith(item()?['subject'],variables('syncBlockerEventName'))),\n  contains(variables('eventResponseTypes'), item()?['responseType']),\n  not(empty(item()?['iCalUId'])),\n  variables('syncToCal1'),\n  or(\n  \tvariables('syncEventsWithoutAttendees'),\n  \tor(\n    \tnot(empty(item()?['requiredAttendees'])),\n    \tnot(empty(item()?['optionalAttendees']))\n  \t)\n  )\n)"
+              },
+              "description": "The real events of calendar 2 (only those for which we want SyncBlocker events)"
+            },
+            "realcal1_event_loop": {
+              "foreach": "@body('realcal1')",
+              "actions": {
+                "Cal2_SB_events_with_matching_location": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "a61670d4-b2d6-4583-a108-78608d546275"
+                  },
+                  "type": "Query",
+                  "inputs": {
+                    "from": "@body('sbcal2')",
+                    "where": "@equals(item()?['body'], items('realcal1_event_loop')['iCalUId'])"
+                  }
+                },
+                "Condition:_if_above_filtered_array_contains_entries": {
+                  "actions": {
+                    "Filtered_Cal2_SB_events": {
+                      "foreach": "@body('Cal2_SB_events_with_matching_location')",
+                      "actions": {
+                        "Condition:_if_Cal2_SB_event_and_original_event_have_diverged": {
+                          "actions": {
+                            "Update_event_(SyncBlocker)_in_cal2": {
+                              "runAfter": {},
+                              "metadata": {
+                                "operationMetadataId": "da3cc5bd-2be4-4761-b66b-be4974b247e9"
+                              },
+                              "type": "OpenApiConnection",
+                              "inputs": {
+                                "host": {
+                                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                  "connectionName": "shared_office365_1",
+                                  "operationId": "V4CalendarPatchItem"
+                                },
+                                "parameters": {
+                                  "table": "@variables('cal2id')",
+                                  "id": "@items('Filtered_Cal2_SB_events')['id']",
+                                  "item/subject": "@variables('sbEventSubject')",
+                                  "item/start": "@items('realcal1_event_loop')['start']",
+                                  "item/end": "@items('realcal1_event_loop')['end']",
+                                  "item/timeZone": "@items('realcal1_event_loop')['timeZone']",
+                                  "item/body": "@items('realcal1_event_loop')['iCalUId']",
+                                  "item/categories": "@variables('categoryCal2')",
+                                  "item/isAllDay": "@items('realcal1_event_loop')['isAllDay']",
+                                  "item/reminderMinutesBeforeStart": "@variables('reminderMinutes')",
+                                  "item/isReminderOn": "@variables('reminderEnabled')",
+                                  "item/showAs": "@items('realcal1_event_loop')['showAs']",
+                                  "item/sensitivity": "@items('realcal1_event_loop')['sensitivity']"
+                                },
+                                "authentication": "@parameters('$authentication')"
+                              }
+                            },
+                            "Debug_log_action": {
+                              "runAfter": {
+                                "Update_event_(SyncBlocker)_in_cal2": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "metadata": {
+                                "operationMetadataId": "886a0016-715f-4dbb-b367-1d8027d59fe3"
+                              },
+                              "type": "AppendToArrayVariable",
+                              "inputs": {
+                                "name": "executedActions",
+                                "value": "Updated outdated SB event in cal2: @{outputs('Update_event_(SyncBlocker)_in_cal2')?['body/subject']} - start: @{outputs('Update_event_(SyncBlocker)_in_cal2')?['body/start']}, end: @{outputs('Update_event_(SyncBlocker)_in_cal2')?['body/end']}"
+                              }
+                            }
+                          },
+                          "runAfter": {},
+                          "expression": {
+                            "or": [
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@items('Filtered_Cal2_SB_events')['start']",
+                                    "@items('realcal1_event_loop')['start']"
+                                  ]
+                                }
+                              },
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@items('Filtered_Cal2_SB_events')['end']",
+                                    "@items('realcal1_event_loop')['end']"
+                                  ]
+                                }
+                              },
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@items('Filtered_Cal2_SB_events')['showAs']",
+                                    "@items('realcal1_event_loop')['showAs']"
+                                  ]
+                                }
+                              },
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@items('Filtered_Cal2_SB_events')['sensitivity']",
+                                    "@items('realcal1_event_loop')['sensitivity']"
+                                  ]
+                                }
+                              },
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@items('Filtered_Cal2_SB_events')['categories']",
+                                    "@variables('categoryCal2')"
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "metadata": {
+                            "operationMetadataId": "18628378-9be3-48cf-867c-eb8d197abff0"
+                          },
+                          "type": "If",
+                          "description": "The comparison SHOULD also contain the event's body and subject, but the comparison is somehow broken / buggy, such that PowerAutomate thinks that the values are always different (even when they are not...)"
+                        }
+                      },
+                      "runAfter": {},
+                      "metadata": {
+                        "operationMetadataId": "69a192dd-bad1-4595-9f67-dfdca4cdf030"
+                      },
+                      "type": "Foreach"
+                    }
+                  },
+                  "runAfter": { "Set_SB-cal2_subject": ["Succeeded"] },
+                  "else": {
+                    "actions": {
+                      "Create_event_(SynBlocker)_in_cal2": {
+                        "runAfter": {},
+                        "metadata": {
+                          "operationMetadataId": "90b1b22a-98e5-43c4-bfde-351c74589d90"
+                        },
+                        "type": "OpenApiConnection",
+                        "inputs": {
+                          "host": {
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                            "connectionName": "shared_office365_1",
+                            "operationId": "V4CalendarPostItem"
+                          },
+                          "parameters": {
+                            "table": "@variables('cal2id')",
+                            "item/subject": "@variables('sbEventSubject')",
+                            "item/start": "@items('realcal1_event_loop')['start']",
+                            "item/end": "@items('realcal1_event_loop')['end']",
+                            "item/timeZone": "@items('realcal1_event_loop')['timeZone']",
+                            "item/body": "@items('realcal1_event_loop')['iCalUId']",
+                            "item/categories": "@variables('categoryCal2')",
+                            "item/isAllDay": "@items('realcal1_event_loop')['isAllDay']",
+                            "item/reminderMinutesBeforeStart": "@variables('reminderMinutes')",
+                            "item/isReminderOn": "@variables('reminderEnabled')",
+                            "item/showAs": "@items('realcal1_event_loop')['showAs']",
+                            "item/sensitivity": "@items('realcal1_event_loop')['sensitivity']"
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      },
+                      "Debug_log_action_(2)": {
+                        "runAfter": {
+                          "Create_event_(SynBlocker)_in_cal2": ["Succeeded"]
+                        },
+                        "metadata": {
+                          "operationMetadataId": "e820c4a5-8e74-4357-8724-43fffc0e2df2"
+                        },
+                        "type": "AppendToArrayVariable",
+                        "inputs": {
+                          "name": "executedActions",
+                          "value": "Created SB event in cal2 for @{outputs('Create_event_(SynBlocker)_in_cal2')?['body/subject']} - start: @{outputs('Create_event_(SynBlocker)_in_cal2')?['body/start']}"
+                        }
+                      }
+                    }
+                  },
+                  "expression": {
+                    "greater": [
+                      "@length(body('Cal2_SB_events_with_matching_location'))",
+                      0
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "2c47acb0-37c9-4b7f-b88c-58561da06e1f"
+                  },
+                  "type": "If"
+                },
+                "Set_SB-cal2_subject": {
+                  "runAfter": {
+                    "Cal2_SB_events_with_matching_location": ["Succeeded"]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "79d6d245-d51b-4b20-b59d-4b9efb3f82d6"
+                  },
+                  "type": "SetVariable",
+                  "inputs": {
+                    "name": "sbEventSubject",
+                    "value": "@{if(variables('hideDetailsInCal2'), concat(variables('syncBlockerEventName'),'Blocker'), concat(variables('syncBlockerEventName'),items('realcal1_event_loop')['subject']))}"
+                  }
+                }
+              },
+              "runAfter": { "realcal2": ["Succeeded"] },
+              "metadata": {
+                "operationMetadataId": "00797fea-4af6-4f44-9ea3-525a4d9b61e2"
+              },
+              "type": "Foreach",
+              "description": "Creates missing SyncBlocker events in calendar 2, or updates the start/end times of already existing SyncBlocker-events."
+            },
+            "sbcal1_event_loop": {
+              "foreach": "@body('sbcal1')",
+              "actions": {
+                "realcal2_events_with_matching_id": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "8ae436b6-4b18-4752-b37c-51cc32187089"
+                  },
+                  "type": "Query",
+                  "inputs": {
+                    "from": "@body('realcal2')",
+                    "where": "@equals(item()?['iCalUId'], items('sbcal1_event_loop')['body'])"
+                  }
+                },
+                "Condition:_if_above_filtered_array_contains_values": {
+                  "actions": {},
+                  "runAfter": {
+                    "realcal2_events_with_matching_id": ["Succeeded"]
+                  },
+                  "else": {
+                    "actions": {
+                      "Delete_event_(SyncBlocker)_in_cal1_that_are_orphaned": {
+                        "runAfter": {},
+                        "metadata": {
+                          "operationMetadataId": "39389c36-f957-403b-a24e-28c721af3366"
+                        },
+                        "type": "OpenApiConnection",
+                        "inputs": {
+                          "host": {
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                            "connectionName": "shared_office365",
+                            "operationId": "CalendarDeleteItem_V2"
+                          },
+                          "parameters": {
+                            "calendar": "@variables('cal1id')",
+                            "event": "@items('sbcal1_event_loop')['id']"
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      },
+                      "Debug_log_action_(3)": {
+                        "runAfter": {
+                          "Delete_event_(SyncBlocker)_in_cal1_that_are_orphaned": [
+                            "Succeeded"
+                          ]
+                        },
+                        "metadata": {
+                          "operationMetadataId": "90037ab7-decf-4f7f-93a5-d2eea410e40c"
+                        },
+                        "type": "AppendToArrayVariable",
+                        "inputs": {
+                          "name": "executedActions",
+                          "value": "Deleted orphaned SB event from cal1: @{concat(items('sbcal1_event_loop')['subject'], ' - start: ', items('sbcal1_event_loop')['start'])}"
+                        }
+                      }
+                    }
+                  },
+                  "expression": {
+                    "greater": [
+                      "@length(body('realcal2_events_with_matching_id'))",
+                      0
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "6667d57e-852d-48a8-bb6b-52512fc24b16"
+                  },
+                  "type": "If"
+                }
+              },
+              "runAfter": { "realcal1_event_loop": ["Succeeded"] },
+              "metadata": {
+                "operationMetadataId": "575fb607-3b62-48b7-a923-20298a5c7738"
+              },
+              "type": "Foreach",
+              "description": "Find and delete orphaned SyncBlocker events in cal1"
+            },
+            "realcal2_event_loop": {
+              "foreach": "@body('realcal2')",
+              "actions": {
+                "Cal1_SB_events_with_matching_location": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "4793d766-72ba-44e5-b031-9eae1adb6723"
+                  },
+                  "type": "Query",
+                  "inputs": {
+                    "from": "@body('sbcal1')",
+                    "where": "@equals(item()?['body'], items('realcal2_event_loop')['iCalUId'])"
+                  }
+                },
+                "Condition:_if_above_filtered_array_contains_more_than_0_entries": {
+                  "actions": {
+                    "Filtered_Cal2_SB_events_loop": {
+                      "foreach": "@body('Cal1_SB_events_with_matching_location')",
+                      "actions": {
+                        "Condition:_if_Cal1_SB_event_and_original_event_have_diverged": {
+                          "actions": {
+                            "Update_event_(SyncBlocker)_in_cal1": {
+                              "runAfter": {},
+                              "metadata": {
+                                "operationMetadataId": "0dbe8bd7-6243-4e32-9a79-6cf262addfee"
+                              },
+                              "type": "OpenApiConnection",
+                              "inputs": {
+                                "host": {
+                                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                  "connectionName": "shared_office365",
+                                  "operationId": "V4CalendarPatchItem"
+                                },
+                                "parameters": {
+                                  "table": "@variables('cal1id')",
+                                  "id": "@items('Filtered_Cal2_SB_events_loop')['id']",
+                                  "item/subject": "@variables('sbEventSubject')",
+                                  "item/start": "@items('realcal2_event_loop')['start']",
+                                  "item/end": "@items('realcal2_event_loop')['end']",
+                                  "item/timeZone": "@items('realcal2_event_loop')['timeZone']",
+                                  "item/body": "@items('realcal2_event_loop')['iCalUId']",
+                                  "item/categories": "@variables('categoryCal1')",
+                                  "item/isAllDay": "@items('realcal2_event_loop')['isAllDay']",
+                                  "item/reminderMinutesBeforeStart": "@variables('reminderMinutes')",
+                                  "item/isReminderOn": "@variables('reminderEnabled')",
+                                  "item/showAs": "@items('realcal2_event_loop')['showAs']",
+                                  "item/sensitivity": "@items('realcal2_event_loop')['sensitivity']"
+                                },
+                                "authentication": "@parameters('$authentication')"
+                              }
+                            },
+                            "Debug_log_action_(5)": {
+                              "runAfter": {
+                                "Update_event_(SyncBlocker)_in_cal1": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "metadata": {
+                                "operationMetadataId": "a8db7bf7-d2d2-4a48-a434-f7c8f350cf28"
+                              },
+                              "type": "AppendToArrayVariable",
+                              "inputs": {
+                                "name": "executedActions",
+                                "value": "Updated outdated SB event in cal1: @{outputs('Update_event_(SyncBlocker)_in_cal1')?['body/subject']} - start: @{outputs('Update_event_(SyncBlocker)_in_cal1')?['body/start']}, end: @{outputs('Update_event_(SyncBlocker)_in_cal1')?['body/end']}"
+                              }
+                            }
+                          },
+                          "runAfter": {},
+                          "expression": {
+                            "or": [
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@items('Filtered_Cal2_SB_events_loop')['start']",
+                                    "@items('realcal2_event_loop')['start']"
+                                  ]
+                                }
+                              },
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@items('Filtered_Cal2_SB_events_loop')['end']",
+                                    "@items('realcal2_event_loop')['end']"
+                                  ]
+                                }
+                              },
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@items('Filtered_Cal2_SB_events_loop')['showAs']",
+                                    "@items('realcal2_event_loop')['showAs']"
+                                  ]
+                                }
+                              },
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@items('Filtered_Cal2_SB_events_loop')['sensitivity']",
+                                    "@items('realcal2_event_loop')['sensitivity']"
+                                  ]
+                                }
+                              },
+                              {
+                                "not": {
+                                  "equals": [
+                                    "@items('Filtered_Cal2_SB_events_loop')['categories']",
+                                    "@variables('categoryCal1')"
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "metadata": {
+                            "operationMetadataId": "9e355f3c-4705-45c7-9869-79ef5ae91a6a"
+                          },
+                          "type": "If"
+                        }
+                      },
+                      "runAfter": {},
+                      "metadata": {
+                        "operationMetadataId": "0a77c460-d040-4a4e-9a73-ddb23c19ae32"
+                      },
+                      "type": "Foreach"
+                    }
+                  },
+                  "runAfter": { "Set_SB-cal1_subject": ["Succeeded"] },
+                  "else": {
+                    "actions": {
+                      "Create_event_(SynBlocker)_in_cal1": {
+                        "runAfter": {},
+                        "metadata": {
+                          "operationMetadataId": "7e2b3ccc-eb14-46ec-a908-4494d70f487c"
+                        },
+                        "type": "OpenApiConnection",
+                        "inputs": {
+                          "host": {
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                            "connectionName": "shared_office365",
+                            "operationId": "V4CalendarPostItem"
+                          },
+                          "parameters": {
+                            "table": "@variables('cal1id')",
+                            "item/subject": "@variables('sbEventSubject')",
+                            "item/start": "@items('realcal2_event_loop')['start']",
+                            "item/end": "@items('realcal2_event_loop')['end']",
+                            "item/timeZone": "@items('realcal2_event_loop')['timeZone']",
+                            "item/body": "@items('realcal2_event_loop')['iCalUId']",
+                            "item/categories": "@variables('categoryCal1')",
+                            "item/isAllDay": "@items('realcal2_event_loop')['isAllDay']",
+                            "item/reminderMinutesBeforeStart": "@variables('reminderMinutes')",
+                            "item/isReminderOn": "@variables('reminderEnabled')",
+                            "item/showAs": "@items('realcal2_event_loop')['showAs']",
+                            "item/sensitivity": "@items('realcal2_event_loop')['sensitivity']"
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      },
+                      "Debug_log_action_(4)": {
+                        "runAfter": {
+                          "Create_event_(SynBlocker)_in_cal1": ["Succeeded"]
+                        },
+                        "metadata": {
+                          "operationMetadataId": "7daeb9e5-76a9-4741-9b88-d62ee948ac5b"
+                        },
+                        "type": "AppendToArrayVariable",
+                        "inputs": {
+                          "name": "executedActions",
+                          "value": "Created SB event in cal1 for @{outputs('Create_event_(SynBlocker)_in_cal1')?['body/subject']} - start: @{outputs('Create_event_(SynBlocker)_in_cal1')?['body/start']}"
+                        }
+                      }
+                    }
+                  },
+                  "expression": {
+                    "greater": [
+                      "@length(body('Cal1_SB_events_with_matching_location'))",
+                      0
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "5c0770e7-346d-4226-854b-0556c4831d05"
+                  },
+                  "type": "If"
+                },
+                "Set_SB-cal1_subject": {
+                  "runAfter": {
+                    "Cal1_SB_events_with_matching_location": ["Succeeded"]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "3c56f848-db76-425d-8e5a-4828f23c0302"
+                  },
+                  "type": "SetVariable",
+                  "inputs": {
+                    "name": "sbEventSubject",
+                    "value": "@{if(variables('hideDetailsInCal1'), concat(variables('syncBlockerEventName'),'Blocker'), concat(variables('syncBlockerEventName'),items('realcal2_event_loop')['subject']))}"
+                  }
+                }
+              },
+              "runAfter": { "sbcal1_event_loop": ["Succeeded"] },
+              "metadata": {
+                "operationMetadataId": "ba6a4969-8e57-4039-be4c-ffff33424825"
+              },
+              "type": "Foreach",
+              "description": "Creates missing SyncBlocker events in calendar 1, or updates the start/end times of already existing SyncBlocker-events."
+            },
+            "sbcal2_event_loop": {
+              "foreach": "@body('sbcal2')",
+              "actions": {
+                "realcal1_events_with_matching_id": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "f2660df2-b5e8-4e2b-bc99-2233f38e49f1"
+                  },
+                  "type": "Query",
+                  "inputs": {
+                    "from": "@body('realcal1')",
+                    "where": "@equals(item()?['iCalUId'], items('sbcal2_event_loop')['body'])"
+                  }
+                },
+                "Condition:_if_above_filtered_array_contains_valuess": {
+                  "actions": {},
+                  "runAfter": {
+                    "realcal1_events_with_matching_id": ["Succeeded"]
+                  },
+                  "else": {
+                    "actions": {
+                      "Delete_event_(SyncBlocker)_in_cal2_that_are_orphaned": {
+                        "runAfter": {},
+                        "metadata": {
+                          "operationMetadataId": "2aef33ba-ad52-4f3c-97a3-9035036d4b57"
+                        },
+                        "type": "OpenApiConnection",
+                        "inputs": {
+                          "host": {
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                            "connectionName": "shared_office365_1",
+                            "operationId": "CalendarDeleteItem_V2"
+                          },
+                          "parameters": {
+                            "calendar": "@variables('cal2id')",
+                            "event": "@items('sbcal2_event_loop')['id']"
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      },
+                      "Debug_log_action_(6)": {
+                        "runAfter": {
+                          "Delete_event_(SyncBlocker)_in_cal2_that_are_orphaned": [
+                            "Succeeded"
+                          ]
+                        },
+                        "metadata": {
+                          "operationMetadataId": "b3cc1e6b-b93e-48e7-b3a3-83b1643715bb"
+                        },
+                        "type": "AppendToArrayVariable",
+                        "inputs": {
+                          "name": "executedActions",
+                          "value": "Deleted orphaned SB event from cal2: @{concat(items('sbcal2_event_loop')['subject'], ' - start: ', items('sbcal2_event_loop')['start'])}"
+                        }
+                      }
+                    }
+                  },
+                  "expression": {
+                    "greater": [
+                      "@length(body('realcal1_events_with_matching_id'))",
+                      0
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "03077fa3-cfab-4ebd-af07-463f9f5da732"
+                  },
+                  "type": "If"
+                }
+              },
+              "runAfter": { "realcal2_event_loop": ["Succeeded"] },
+              "metadata": {
+                "operationMetadataId": "082c01f5-1625-4804-be03-c4a394267ba5"
+              },
+              "type": "Foreach"
+            },
+            "Display_executed_actions_(for_debugging)": {
+              "runAfter": { "sbcal2_event_loop": ["Succeeded"] },
+              "metadata": {
+                "operationMetadataId": "3229fecb-368e-47ec-b096-425420be9250"
+              },
+              "type": "Query",
+              "inputs": {
+                "from": "@variables('executedActions')",
+                "where": "@equals('', '')"
+              },
+              "description": "We simply don't filter anything, and just abuse the filter, to be able to see the variable's current value"
+            },
+            "Check_event_count_cal1": {
+              "actions": {
+                "Terminate": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "fb657489-4a8c-492e-afcd-b2ca3f51932a"
+                  },
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Failed",
+                    "runError": {
+                      "message": "There were too many events in your calendar -> unable to retrieve all events for the requested number of @{variables('daysToSync')} days. This could lead to duplicated events, so this flow run is aborted as a safety measure."
+                    }
+                  }
+                }
+              },
+              "runAfter": { "Store_events_in_cal1": ["Succeeded"] },
+              "expression": {
+                "equals": [
+                  "@length(variables('cal1'))",
+                  "@variables('eventCountUpperLimit')"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "f530f983-2569-4974-8579-ee2a92d38c78"
+              },
+              "type": "If"
+            },
+            "Check_event_count_cal2": {
+              "actions": {
+                "Terminate_2": {
+                  "runAfter": {},
+                  "metadata": {
+                    "operationMetadataId": "ca492b64-66cb-442f-9523-d2d2d037b3d9"
+                  },
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Failed",
+                    "runError": {
+                      "message": "There were too many events in your calendar -> unable to retrieve all events for the requested number of @{variables('daysToSync')} days. This could lead to duplicated events, so this flow run is aborted as a safety measure."
+                    }
+                  }
+                }
+              },
+              "runAfter": { "Store_events_in_cal2": ["Succeeded"] },
+              "expression": {
+                "equals": [
+                  "@length(variables('cal2'))",
+                  "@variables('eventCountUpperLimit')"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "8ac8bf3d-9ef2-45b5-bc1b-f83f5e7da9bf"
+              },
+              "type": "If"
+            }
+          },
+          "runAfter": {
+            "Initialize_SyncBlocker_event_body_helper_variable": ["Succeeded"]
+          },
+          "expression": {
+            "and": [
+              { "equals": ["@length(body('Find_correct_cal1_calendar'))", 1] },
+              { "equals": ["@length(body('Find_correct_cal2_calendar'))", 1] }
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "3afd25ac-85ce-4294-be30-0ae30e827ab4"
+          },
+          "type": "If"
+        },
+        "Init_calendar_1_ID_variable": {
+          "runAfter": { "Find_correct_cal2_calendar": ["Succeeded"] },
+          "metadata": {
+            "operationMetadataId": "3dc295a3-c996-43dc-a24f-426c5a418f98"
+          },
+          "type": "InitializeVariable",
+          "inputs": { "variables": [{ "name": "cal1id", "type": "string" }] }
+        },
+        "Init_calendar_2_ID_variable": {
+          "runAfter": { "Init_calendar_1_ID_variable": ["Succeeded"] },
+          "metadata": {
+            "operationMetadataId": "62b6c611-9d30-421d-a371-f9e00430c663"
+          },
+          "type": "InitializeVariable",
+          "inputs": { "variables": [{ "name": "cal2id", "type": "string" }] }
+        },
+        "Init_cal1_events": {
+          "runAfter": { "Init_calendar_2_ID_variable": ["Succeeded"] },
+          "metadata": {
+            "operationMetadataId": "53e2aa68-210c-4d5f-acde-9df3c4ab12bf"
+          },
+          "type": "InitializeVariable",
+          "inputs": { "variables": [{ "name": "cal1", "type": "array" }] }
+        },
+        "Init_cal2_events": {
+          "runAfter": { "Init_cal1_events": ["Succeeded"] },
+          "metadata": {
+            "operationMetadataId": "3d6fee77-14aa-49ee-b1d2-8d24493c3f3c"
+          },
+          "type": "InitializeVariable",
+          "inputs": { "variables": [{ "name": "cal2", "type": "array" }] }
+        },
+        "Initialize_executed_actions_helper_variable": {
+          "runAfter": { "Init_cal2_events": ["Succeeded"] },
+          "metadata": {
+            "operationMetadataId": "e1d0ca22-3dfd-4e95-b957-45f5caf06e75"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [{ "name": "executedActions", "type": "array" }]
+          },
+          "description": "This variable is like a log of actions executed by this flow run"
+        },
+        "Setting:_SyncBlocker_event_reminder": {
+          "runAfter": {
+            "Setting:_create_SyncBlocker_events_only_for_these_event_responses": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "a4526ee2-00f3-4cc9-bb64-f0c01f17ffa8"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              { "name": "reminderEnabled", "type": "boolean", "value": false }
+            ]
+          },
+          "description": "Configures whether Outlook should show a reminder for SyncBlocker events."
+        },
+        "Setting:_SyncBlocker_event_reminder_minutes": {
+          "runAfter": { "Setting:_SyncBlocker_event_reminder": ["Succeeded"] },
+          "metadata": {
+            "operationMetadataId": "0800697f-e04c-4c38-a25d-618f124de482"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              { "name": "reminderMinutes", "type": "integer", "value": 15 }
+            ]
+          },
+          "description": "If you set the above setting (\"SyncBlocker event reminder\") to true, this setting configures how many minutes (prior to the sync-blocker event start time) Outlook should show the event notification / reminder."
+        },
+        "Setting:_Abort_flow_on_too_many_events": {
+          "runAfter": {
+            "Setting:_SyncBlocker_event_reminder_minutes": ["Succeeded"]
+          },
+          "metadata": {
+            "operationMetadataId": "b857bbbe-289f-42da-8106-b8356fa5c5c6"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "eventCountUpperLimit",
+                "type": "integer",
+                "value": 512
+              }
+            ]
+          },
+          "description": "If your \"Days to sync\" setting is too high (resulting in too many events in that timeframe), this flow is aborted with an error, as a precautionary measure."
+        },
+        "Initialize_SyncBlocker_event_subject_helper_variable": {
+          "runAfter": {
+            "Initialize_executed_actions_helper_variable": ["Succeeded"]
+          },
+          "metadata": {
+            "operationMetadataId": "77cae0aa-f3e6-445c-86d4-28547e6df7ff"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [{ "name": "sbEventSubject", "type": "string" }]
+          }
+        },
+        "Initialize_SyncBlocker_event_body_helper_variable": {
+          "runAfter": {
+            "Initialize_SyncBlocker_event_subject_helper_variable": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "7ca32a3a-8679-48d7-840b-019a17f58bf3"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [{ "name": "sbEventBody", "type": "string" }]
+          }
+        },
+        "Setting:_hide_event_details_in_calendar_2": {
+          "runAfter": {
+            "Setting:_hide_event_details_in_calendar_1": ["Succeeded"]
+          },
+          "metadata": {
+            "operationMetadataId": "d723dfb2-7ad1-43ec-a4bd-a2ff0e9f9f52"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              { "name": "hideDetailsInCal2", "type": "boolean", "value": false }
+            ]
+          },
+          "description": "If you set this to true, the sync blocker event in calendar 2 will not have the real subject of the corresponding real calendar 1 event, but a dummy text. This is useful for privacy reasons."
+        },
+        "Setting:_category_for_SyncBlocker_events_in_calendar_1": {
+          "runAfter": {
+            "Setting:_synchronize_events_without_other_attendees": ["Succeeded"]
+          },
+          "metadata": {
+            "operationMetadataId": "24697e02-d308-42a1-a703-6d29ef673f68"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              { "name": "categoryCal1", "type": "array", "value": [] }
+            ]
+          },
+          "description": "You can colorize your sync blocker events by assigning a category to them (whose names+colors you manage in Outlook). To assign a category for the blocker events in calendar 1, provide something like [\"mycategory\"]"
+        },
+        "Setting:_category_for_SyncBlocker_events_in_calendar_2": {
+          "runAfter": {
+            "Setting:_category_for_SyncBlocker_events_in_calendar_1": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "d60c3fbc-57a9-432d-9655-20a796f2e1d8"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              { "name": "categoryCal2", "type": "array", "value": [] }
+            ]
+          },
+          "description": "You can colorize your sync blocker events by assigning a category to them (whose names+colors you manage in Outlook). To assign a category for the blocker events in calendar 2, provide something like [\"mycategory\"]"
+        },
+        "Setting:_synchronize_from_calendar_2_to_calendar_1": {
+          "runAfter": {
+            "Setting:_hide_event_details_in_calendar_2": ["Succeeded"]
+          },
+          "metadata": {
+            "operationMetadataId": "87b87d90-732b-430a-900b-7962a985d179"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              { "name": "syncToCal1", "type": "boolean", "value": true }
+            ]
+          },
+          "description": "Whether to create SyncBlocker events in calendar 1, based on real events from calendar 2. Set to false to achieve uni-directional synchronization."
+        },
+        "Setting:_synchronize_from_calendar_1_to_calendar_2": {
+          "runAfter": {
+            "Setting:_synchronize_from_calendar_2_to_calendar_1": ["Succeeded"]
+          },
+          "metadata": {
+            "operationMetadataId": "0272366d-1fe1-444f-8690-7e783a896438"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              { "name": "syncToCal2", "type": "boolean", "value": true }
+            ]
+          },
+          "description": "Whether to create SyncBlocker events in calendar 2, based on real events from calendar 1. Set to false to achieve uni-directional synchronization."
+        },
+        "Setting:_synchronize_events_without_other_attendees": {
+          "runAfter": {
+            "Setting:_synchronize_from_calendar_1_to_calendar_2": ["Succeeded"]
+          },
+          "metadata": {
+            "operationMetadataId": "75645468-f46f-4ba6-a821-ba2f28fd564f"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "syncEventsWithoutAttendees",
+                "type": "boolean",
+                "value": true
+              }
+            ]
+          },
+          "description": "Set this to false if you do not want to synchronize events that you created just for yourself (e.g. reminders for a doctor's appointment)."
+        },
+        "Setting:_hide_event_details_in_calendar_1": {
+          "runAfter": {
+            "Setting:_Abort_flow_on_too_many_events": ["Succeeded"]
+          },
+          "metadata": {
+            "operationMetadataId": "a2c7d924-273c-46c9-8ccc-2ef8bbc7c92b"
+          },
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              { "name": "hideDetailsInCal1", "type": "boolean", "value": false }
+            ]
+          },
+          "description": "If you set this to true, the sync blocker event in calendar 1 will not have the real subject of the corresponding real calendar 2 event, but a dummy text. This is useful for privacy reasons"
+        }
+      },
+      "description": "See https://github.com/MShekow/outlook-calendar-sync"
+    },
+    "connectionReferences": {
+      "shared_office365": {
+        "connectionName": "shared-office365-60785805-c0f6-42e7-953f-862bc362d824",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "tier": "NotSpecified"
+      },
+      "shared_office365_1": {
+        "connectionName": "shared-office365-95bf95ac-13c1-4a45-ad60-debff2968a4b",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "tier": "NotSpecified"
+      }
+    },
+    "flowFailureAlertSubscribed": false,
+    "isManaged": false
+  }
+}
